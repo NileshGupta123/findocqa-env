@@ -1,5 +1,3 @@
-# FinDocQA-Env 🏦
-
 ---
 title: FinDocQA-Env
 emoji: 🏦
@@ -12,6 +10,8 @@ short_description: OpenEnv environment for financial document QA
 tags:
   - openenv
 ---
+
+# FinDocQA-Env 🏦
 
 An OpenEnv environment for evaluating AI agents on financial document 
 comprehension tasks. Agents must extract key facts, answer analytical 
