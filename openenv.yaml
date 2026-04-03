@@ -1,0 +1,115 @@
+name: findocqa-env
+version: "1.0.0"
+description: >
+  FinDocQA-Env is an OpenEnv environment for evaluating AI agents on
+  financial document comprehension tasks. Agents must extract key facts,
+  answer analytical questions, and identify contradictions across
+  real-world style business and financial report excerpts.
+
+author: Nile-2026
+license: MIT
+tags:
+  - finance
+  - document-qa
+  - information-extraction
+  - conflict-detection
+  - openenv
+
+environment:
+  type: text
+  api_base: http://localhost:7860
+  endpoints:
+    reset: /reset
+    step: /step
+    state: /state
+    health: /health
+
+action_space:
+  type: text
+  description: >
+    A single text string containing the agent's response to the
+    current financial document task.
+  fields:
+    - name: response
+      type: string
+      required: true
+      description: Agent's text response to the document task
+
+observation_space:
+  type: text
+  description: >
+    A structured observation containing the document excerpt,
+    task type, instructions, and optional questions.
+  fields:
+    - name: document
+      type: string
+      description: Financial document excerpt to analyze
+    - name: task_type
+      type: string
+      enum: [extract-facts, answer-questions, identify-conflicts]
+      description: The type of task the agent must perform
+    - name: instructions
+      type: string
+      description: Detailed instructions for the current task
+    - name: questions
+      type: array
+      items: string
+      nullable: true
+      description: List of questions for answer-questions task
+    - name: step
+      type: integer
+      description: Current step number in the episode
+
+reward:
+  type: float
+  min: 0.0
+  max: 1.0
+  description: >
+    Normalized reward score between 0.0 and 1.0.
+    Provides partial credit — never binary.
+    Based on fuzzy match, token F1, or keyword coverage
+    depending on task type.
+
+tasks:
+  - id: extract-facts
+    name: Extract Financial Facts
+    difficulty: easy
+    description: >
+      Agent must extract 4 specific facts from a financial report:
+      total revenue, company name, reporting period, and YoY change.
+    expected_score: 0.70
+    grader: fuzzy string match per field, mean score
+
+  - id: answer-questions
+    name: Answer Comprehension Questions
+    difficulty: medium
+    description: >
+      Agent must answer 4 comprehension questions about a financial
+      document. Scored using token-level F1 (SQuAD methodology).
+    expected_score: 0.50
+    grader: token F1 score per question, mean score
+
+  - id: identify-conflicts
+    name: Identify Document Conflicts
+    difficulty: hard
+    description: >
+      Agent must identify all contradictions between two sections
+      of a financial report written by different executives.
+      Scored on topic coverage and both-sides referencing.
+    expected_score: 0.30
+    grader: weighted keyword coverage across conflict topics
+
+episodes:
+  max_steps: 1
+  reset_on_done: true
+  randomize_tasks: true
+  randomize_documents: true
+
+baseline:
+  script: inference.py
+  model: llama3-8b-8192
+  api: groq
+  expected_scores:
+    extract-facts: 0.70
+    answer-questions: 0.50
+    identify-conflicts: 0.30
