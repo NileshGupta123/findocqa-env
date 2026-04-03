@@ -1,5 +1,18 @@
 # FinDocQA-Env 🏦
 
+---
+title: FinDocQA-Env
+emoji: 🏦
+colorFrom: blue
+colorTo: green
+sdk: docker
+pinned: false
+license: mit
+short_description: OpenEnv environment for financial document QA
+tags:
+  - openenv
+---
+
 An OpenEnv environment for evaluating AI agents on financial document 
 comprehension tasks. Agents must extract key facts, answer analytical 
 questions, and identify contradictions in real-world style business 
