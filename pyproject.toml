@@ -1,0 +1,20 @@
+[project]
+name = "findocqa-env"
+version = "1.0.0"
+description = "OpenEnv environment for financial document QA"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi",
+    "uvicorn",
+    "pydantic",
+    "python-dotenv",
+    "rapidfuzz",
+    "openai",
+]
+
+[project.urls]
+Homepage = "https://huggingface.co/spaces/Nile-2026/findocqa-env"
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.backends.legacy:SetupToolsBackend"
