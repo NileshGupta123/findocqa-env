@@ -20,7 +20,7 @@ import urllib.request
 import urllib.error
 import json
 
-load_dotenv()
+load_dotenv(override=False)
 
 # ── Config ────────────────────────────────────────────────────────────────────
 API_BASE_URL = os.environ["API_BASE_URL"]
