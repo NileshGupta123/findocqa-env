@@ -7,26 +7,31 @@ Emits structured stdout logs in [START], [STEP], [END] format.
 Required environment variables:
     API_BASE_URL   The API endpoint for the LLM
     MODEL_NAME     The model identifier
-    HF_TOKEN       Your API key
+    API_KEY        Your API key (injected by validator)
 """
 
 import os
 import sys
+import json
 import textwrap
-from typing import Optional
-from openai import OpenAI
-from dotenv import load_dotenv
 import urllib.request
 import urllib.error
-import json
+from typing import Optional
+from openai import OpenAI
 
-load_dotenv(override=False)
+# Only load .env locally — never override injected environment variables
+if not os.environ.get("API_KEY"):
+    try:
+        from dotenv import load_dotenv
+        load_dotenv(override=False)
+    except ImportError:
+        pass
 
 # ── Config ────────────────────────────────────────────────────────────────────
-API_BASE_URL = os.environ["API_BASE_URL"]
+API_BASE_URL = os.environ.get("API_BASE_URL", "https://api.groq.com/openai/v1")
 MODEL_NAME   = os.environ.get("MODEL_NAME", "llama-3.1-8b-instant")
-API_KEY      = os.environ["API_KEY"]
-ENV_BASE_URL = os.getenv("ENV_BASE_URL", "http://localhost:8000")
+API_KEY      = os.environ.get("API_KEY") or os.environ.get("HF_TOKEN")
+ENV_BASE_URL = os.environ.get("ENV_BASE_URL", "https://nile-2026-findocqa-env.hf.space")
 BENCHMARK    = "findocqa-env"
 MAX_STEPS    = 1
 
@@ -39,7 +44,6 @@ def log_start(task: str, env: str, model: str) -> None:
 
 
 def log_step(step: int, action: str, reward: float, done: bool, error: Optional[str]) -> None:
-    # Clean action for single line logging
     clean_action = action.replace("\n", " ").replace("\r", " ")[:80]
     error_val = error if error else "null"
     done_val = str(done).lower()
@@ -69,7 +73,7 @@ def env_request(endpoint: str, data: dict = {}) -> dict:
         headers={"Content-Type": "application/json"},
         method="POST"
     )
-    with urllib.request.urlopen(req, timeout=30) as resp:
+    with urllib.request.urlopen(req, timeout=60) as resp:
         return json.loads(resp.read().decode("utf-8"))
 
 
@@ -119,10 +123,8 @@ def get_agent_response(
     questions: Optional[list]
 ) -> str:
     """Call the LLM with document + task instructions."""
-
     system_prompt = SYSTEM_PROMPTS.get(task_type, SYSTEM_PROMPTS["extract-facts"])
 
-    # Build user message
     user_parts = [
         f"DOCUMENT:\n{document}",
         f"\nTASK INSTRUCTIONS:\n{instructions}"
@@ -140,7 +142,7 @@ def get_agent_response(
                 {"role": "system", "content": system_prompt},
                 {"role": "user",   "content": user_message}
             ],
-            temperature=0.1,  # low temp for factual tasks
+            temperature=0.1,
             max_tokens=512,
             stream=False
         )
@@ -162,21 +164,18 @@ def run_task(client: OpenAI, task_type: str) -> dict:
     log_start(task=task_type, env=BENCHMARK, model=MODEL_NAME)
 
     try:
-        # Reset environment for this task
         reset_resp = env_request("/reset", {"task_type": task_type})
         obs = reset_resp["observation"]
 
-        document    = obs["document"]
+        document     = obs["document"]
         instructions = obs["instructions"]
-        questions   = obs.get("questions")
-        done        = False
-        error       = None
+        questions    = obs.get("questions")
+        done         = False
 
         for step in range(1, MAX_STEPS + 1):
             if done:
                 break
 
-            # Get agent response from LLM
             action = get_agent_response(
                 client=client,
                 task_type=task_type,
@@ -185,12 +184,10 @@ def run_task(client: OpenAI, task_type: str) -> dict:
                 questions=questions
             )
 
-            # Submit to environment
             step_resp = env_request("/step", {"response": action})
 
-            reward      = step_resp["reward"]
-            done        = step_resp["done"]
-            error       = step_resp["info"].get("feedback", None)
+            reward = step_resp["reward"]
+            done   = step_resp["done"]
 
             rewards.append(reward)
             steps_taken = step
@@ -236,8 +233,12 @@ def run_task(client: OpenAI, task_type: str) -> dict:
 
 def main():
     if not API_KEY:
-        print("[ERROR] HF_TOKEN not set in environment.", flush=True)
+        print("[ERROR] API_KEY not set in environment.", flush=True)
         sys.exit(1)
+
+    print(f"[DEBUG] API_BASE_URL={API_BASE_URL}", flush=True)
+    print(f"[DEBUG] MODEL_NAME={MODEL_NAME}", flush=True)
+    print(f"[DEBUG] ENV_BASE_URL={ENV_BASE_URL}", flush=True)
 
     client = OpenAI(
         base_url=API_BASE_URL,
@@ -258,7 +259,6 @@ def main():
         all_results.append(result)
         print(f"--- Score: {result['score']:.3f} ---\n", flush=True)
 
-    # Final summary
     print(f"\n{'='*60}", flush=True)
     print("FINAL RESULTS", flush=True)
     print(f"{'='*60}", flush=True)
